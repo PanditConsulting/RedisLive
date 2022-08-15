@@ -4,8 +4,8 @@ MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
 RUN apk add --update py-pip && rm -rf /var/cache/apk/*
 
-RUN rm /etc/localtime
-RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
+#RUN rm /etc/localtime
+#RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
 
 RUN mkdir -p /redislive
 COPY . /redislive
