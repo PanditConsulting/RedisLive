@@ -14,6 +14,7 @@ RUN cd /redislive \
 
 WORKDIR /redislive/src
 ENV HOME /redislive/src
+ENV PYTHONPATH /redislive/src
 
 EXPOSE 63790
 
