@@ -1,4 +1,4 @@
-from BaseController import BaseController
+from api.controller.BaseController import BaseController
 from api.util import settings
 
 class ServerListController(BaseController):
