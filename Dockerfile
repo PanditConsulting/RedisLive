@@ -1,8 +1,8 @@
-FROM sushanto/prv:python
+FROM alpine
 
 MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
-RUN pip install --upgrade pip
+RUN apk add --update py-pip && rm -rf /var/cache/apk/*
 
 RUN rm /etc/localtime
 RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
