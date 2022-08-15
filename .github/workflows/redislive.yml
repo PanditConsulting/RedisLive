@@ -24,6 +24,5 @@ jobs:
     - name: Build Redis Live Docker image
       run: |
           export tag="redis-stat"
-          cd $tag
           docker build . --tag $dkr_repo:$tag
           docker push $dkr_repo:$tag
