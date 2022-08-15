@@ -15,10 +15,10 @@ from api.controller.TopCommandsController import TopCommandsController
 from api.controller.TopKeysController import TopKeysController
 
 if __name__ == "__main__":
-    define("server", default="localhost", help="run on the given host", type=str)
+    #define("server", default="localhost", help="run on the given host", type=str)
     define("port", default=63790, help="run on the given port", type=int)
     define("debug", default=0, help="debug mode", type=int)
-    tornado.options.parse_command_line()
+    #tornado.options.parse_command_line()
 
     # Bootup
     handlers = [
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     (r"/(.*)", BaseStaticFileHandler, {"path": "www", "default_filename": "index.html"})
     ]
 
-    server_settings = {'debug': options.debug}
+    server_settings = {'debug': 0} # options.debug}
     application = tornado.web.Application(handlers, **server_settings)
-    application.listen(options.port)
+    application.listen(63790) #options.port)
     tornado.ioloop.IOLoop.instance().start()
