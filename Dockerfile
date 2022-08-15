@@ -13,6 +13,7 @@ RUN cd /redislive \
     && pip install -r requirements.txt
 
 WORKDIR /redislive/src
+ENV HOME /redislive/src
 
 EXPOSE 63790
 
