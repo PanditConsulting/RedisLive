@@ -1,11 +1,11 @@
-FROM alpine
+FROM sushanto/prv:python
 
 MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
-RUN apk add --update py-pip && rm -rf /var/cache/apk/*
+RUN pip install --upgrade pip
 
-#RUN rm /etc/localtime
-#RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
+RUN rm /etc/localtime
+RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
 
 RUN mkdir -p /redislive
 COPY . /redislive
