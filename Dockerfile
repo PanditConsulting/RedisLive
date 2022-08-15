@@ -13,6 +13,7 @@ RUN cd /redislive \
     && pip install -r requirements.txt
 
 RUN pip install python-dateutil --upgrade
+RUN pip install tornado --upgrade
 
 WORKDIR /redislive/src
 ENV HOME /redislive/src
