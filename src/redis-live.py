@@ -15,6 +15,7 @@ from api.controller.TopCommandsController import TopCommandsController
 from api.controller.TopKeysController import TopKeysController
 
 if __name__ == "__main__":
+    define("server", default=localhost, help="run on the given host", type=string)
     define("port", default=63790, help="run on the given port", type=int)
     define("debug", default=0, help="debug mode", type=int)
     tornado.options.parse_command_line()
