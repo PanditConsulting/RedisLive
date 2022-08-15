@@ -1,4 +1,4 @@
-FROM sushanto/prv:python3
+FROM sushanto/prv:python2
 
 MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
