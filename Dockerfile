@@ -19,5 +19,5 @@ EXPOSE 63790
 # Configure container to run as an executable
 CMD ["./redis-monitor.py", "--duration=120", "--quiet"]
 
-ENTRYPOINT ["./redis-live.py --port 63790"]
+ENTRYPOINT ["./redis-live.py"]
 
