@@ -12,6 +12,8 @@ COPY . /redislive
 RUN cd /redislive \
     && pip install -r requirements.txt
 
+RUN pip install python-dateutil --upgrade
+
 WORKDIR /redislive/src
 ENV HOME /redislive/src
 ENV PYTHONPATH /redislive/src
