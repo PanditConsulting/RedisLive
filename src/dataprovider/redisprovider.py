@@ -101,7 +101,6 @@ class RedisStatsProvider(object):
             server (str): The server ID
         """
         info = self.conn.get(server + ":Info")
-        print(info)
         # FIXME: If the collector has never been run we get a 500 here. `None`
         # is not a valid type to pass to json.loads.
         info = json.loads(info)
