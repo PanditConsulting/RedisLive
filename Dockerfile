@@ -3,16 +3,21 @@ FROM sushanto/prv:python
 MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
 RUN pip install --upgrade pip
-RUN pip install tornado
-RUN pip install redis
-RUN pip install python-dateutil
 
 RUN rm /etc/localtime
 RUN ln -sf /usr/share/zoneinfo/US/Pacific /etc/localtime
 
-COPY src/* /opt/
-COPY start.sh /
-COPY redis-live.conf /opt/
+RUN mkdir -p /redislive
+COPY . /redislive
+RUN cd /redislive \
+    && pip install -r requirements.txt
 
-ENTRYPOINT ["/start.sh"]
+WORKDIR /redislive/src
+
+EXPOSE 63790
+
+# Configure container to run as an executable
+CMD ["./redis-monitor.py", "--duration=120", "--quiet"]
+
+ENTRYPOINT ["./redis-live.py --port 63790"]
 
