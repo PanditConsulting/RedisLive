@@ -1,4 +1,3 @@
-argparse==1.2.1
-python-dateutil==1.5
+python-dateutil
 redis
-tornado==2.1.1
+tornado
