@@ -1,4 +1,4 @@
-FROM sushanto/prv:python2
+FROM sushanto/prv:python3
 
 MAINTAINER Sushanto Pandit <sushanto@gmail.com>
 
@@ -14,6 +14,7 @@ RUN cd /redislive \
 
 RUN pip install python-dateutil --upgrade
 RUN pip install tornado --upgrade
+RUN pip install sqlalchemy --upgrade
 
 WORKDIR /redislive/src
 ENV HOME /redislive/src
