@@ -15,6 +15,7 @@ RUN cd /redislive \
 RUN pip install python-dateutil --upgrade
 RUN pip install tornado --upgrade
 RUN pip install sqlalchemy --upgrade
+RUN pip install argparse --upgrade
 
 WORKDIR /redislive/src
 ENV HOME /redislive/src
