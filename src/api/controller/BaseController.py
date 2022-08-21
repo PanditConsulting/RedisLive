@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+# ******************************************************
+# DESC    :
+# AUTHOR  : Alex Stocks
+# VERSION : 1.0
+# LICENCE : LGPL V3
+# EMAIL   : alexstocks@foxmail.com
+# MOD     : 2016-04-14 17:04
+# FILE    : BaseController.py
+# ******************************************************
+
 from dataprovider.dataprovider import RedisLiveDataProvider
 import tornado.ioloop
 import tornado.web

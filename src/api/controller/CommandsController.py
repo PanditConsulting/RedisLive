@@ -1,4 +1,4 @@
-from api.controller.BaseController import BaseController
+from BaseController import BaseController
 import tornado.ioloop
 import tornado.web
 import dateutil.parser
@@ -10,6 +10,7 @@ class CommandsController(BaseController):
     def get(self):
         """Serves a GET request.
         """
+        # print("CommandsController::get()")
         return_data = dict(data=[], timestamp=datetime.now().isoformat())
 
         server = self.get_argument("server")

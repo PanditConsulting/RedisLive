@@ -1,5 +1,5 @@
 from decimal import Decimal
-from api.controller.BaseController import BaseController
+from BaseController import BaseController
 import tornado.ioloop
 import tornado.web
 import re
@@ -31,6 +31,17 @@ class InfoController(BaseController):
 
         uptime_seconds = redis_info['uptime_in_seconds']
         redis_info['uptime'] = self.shorten_time(uptime_seconds)
+
+        redis_info['peer'] = 'None'
+        role = redis_info['role']
+        if role == 'master':
+            slave_num = int(redis_info['connected_slaves'])
+            if slave_num != 0:
+                redis_info['peer'] = redis_info['slave0']['ip'] + ':' \
+                    + str(redis_info['slave0']['port']) + 'S'
+        elif role == 'slave':
+                redis_info['peer'] = redis_info['master_host'] + ':' \
+                    + str(redis_info['master_port']) + 'M'
 
         commands_processed = redis_info['total_commands_processed']
         commands_processed = self.shorten_number(commands_processed)

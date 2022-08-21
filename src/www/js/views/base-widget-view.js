@@ -2,6 +2,7 @@ var BaseWidget = Backbone.View.extend({
 
   enableLogging : false
 
+// , updateFrequency : 5000
 , updateFrequency : 5000
 
 , Name : "BaseWidget"
@@ -10,29 +11,30 @@ var BaseWidget = Backbone.View.extend({
 
 , events : {
              "click .time-period" : "ChangeTimeFrame"
-           , "click .go" : "Go"          
+           , "click .go" : "Go"
            }
 
 , init : function () {
 
       var self = this
 
-      $(document).on("ServerChange", function(e, server){      
-        self.server = server      
-      })    
+      $(document).on("ServerChange", function(e, server){
+        self.server = server
+      })
 
-      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )      
+      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )
 
+      this.updateFrequency = 15000
       // set event listners
       this.model
         .on("error", this.error, this)
-        .on("change", this.ModelChanged, this)       
-      
+        .on("change", this.ModelChanged, this)
+
   }
 
-, UpdateModel : function ( enableTimer ) {    
+, UpdateModel : function ( enableTimer ) {
 
-    clearInterval(this.timer)    
+    clearInterval(this.timer)
 
     this.startTime = new Date()
 
@@ -46,25 +48,25 @@ var BaseWidget = Backbone.View.extend({
     })
 
     this.enableTimer = enableTimer
-   
+
   }
 
 , ModelChanged : function(){
 
     this.endTime = new Date()
     var timeElapsed = (this.endTime - this.startTime);
-    
+
     if (this.enableLogging)
       console.log(this.Name + ": Time Elapsed = " + timeElapsed + " ms")
 
     this.render()
 
-    if(this.enableTimer)     
+    if(this.enableTimer)
     {
       var self = this
-      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )              
+      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )
     }
-} 
+}
 
 , Go : function( el ) {
     this.UpdateModel(false)
@@ -87,57 +89,57 @@ var BaseWidget = Backbone.View.extend({
       $(el.target)
         .closest(".btn-group")
         .siblings(".date-control")
-        .css("display","inline")      
+        .css("display","inline")
     }
-    // real time    
+    // real time
     else if ( selectionType == "realtime" ) {
       $(el.target)
         .closest(".btn-group")
         .siblings(".date-control")
         .css("display","none")
-      
+
       var self = this
       this.$el.find('[name=from]').val("")
       this.$el.find('[name=to]').val("")
-      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )      
+      this.timer = setInterval( function () { self.UpdateModel(true) }, this.updateFrequency )
     }
     // one of the template time frame selected
-    // example: last 15mins, last 1 day etc    
+    // example: last 15mins, last 1 day etc
     else {
 
       $(el.target)
         .closest(".btn-group")
         .siblings(".date-control")
-        .css("display","none")      
+        .css("display","none")
 
       var endDate = new Date()
-        , startDate = endDate          
+        , startDate = endDate
 
       switch(selectionType) {
 
-        case 'minute' : 
+        case 'minute' :
           startDate = new Date(endDate - timeFrame * 60000)
           break
-                       
-        case 'hour' :  
+
+        case 'hour' :
           startDate = new Date(endDate - timeFrame * 60*60000)
           break
 
-        case 'day' :  
+        case 'day' :
           startDate = new Date(endDate - timeFrame * 24*60*60000)
           break
 
-        case 'week' :  
+        case 'week' :
           startDate = new Date(endDate - timeFrame * 7*24*60*60000)
           break
 
-        case 'month' :  
+        case 'month' :
           startDate = new Date(endDate - timeFrame * 30*24*60*60000)
           break
       }
 
       this.$el.find('[name=from]').val(this.ISODateString(startDate))
-      this.$el.find('[name=to]').val(this.ISODateString(endDate))              
+      this.$el.find('[name=to]').val(this.ISODateString(endDate))
       this.UpdateModel(false)
 
     }
@@ -148,7 +150,7 @@ var BaseWidget = Backbone.View.extend({
     function pad ( n ) {
       return n < 10 ? '0'+n : n
     }
-    
+
     return d.getFullYear()+'-'
          + pad(d.getMonth()+1)+'-'
          + pad(d.getDate())+' '
@@ -162,5 +164,5 @@ var BaseWidget = Backbone.View.extend({
       console.log(this.Name + ": Error Occured \n" + error + "\n" + model )
 
   }
-        
+
 })

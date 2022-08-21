@@ -1,8 +1,13 @@
+#! /usr/bin/env python
+# -*- coding: UTF-8 -*-
+
 from api.util import settings, timeutils
 from datetime import datetime, timedelta
 import redis
 import json
 import ast
+import logging
+from api.util import log
 
 class RedisStatsProvider(object):
     """A Redis based persistance to store and fetch stats"""
@@ -19,15 +24,83 @@ class RedisStatsProvider(object):
         """Saves used and peak memory stats,
 
         Args:
-            server (str): The server ID
-            timestamp (datetime): The time of the info.
-            used (int): Used memory value.
-            peak (int): Peak memory value.
+            server (str): The server ID                        # redis server的id，其拼写格式是server-ip:server-port
+            timestamp (datetime): The time of the info.        # 2016-04-14 11:40:13.663000
+            used (int): Used memory value.                    # used_memory:258578280
+            peak (int): Peak memory value.                    # used_memory_peak:26324479
         """
         data = {"timestamp": str(timeutils.convert_to_epoch(timestamp)),
                 "used": used,
                 "peak": peak}
         self.conn.zadd(server + ":memory", str(timeutils.convert_to_epoch(timestamp)), data)
+
+    def save_keyspace_info(self, server, timestamp, persists, expires):
+        """Saves used and peak memory stats,
+
+        Args:
+            server (str): The server ID                        # redis server的id，其拼写格式是server-ip:server-port
+            timestamp (datetime): The time of the info.        # 2016-04-14 11:40:13.663000
+            persists (int): keyspace:keys
+            expires (int): keyspace:expires
+        """
+        data = {"timestamp": str(timeutils.convert_to_epoch(timestamp)),
+                "persists": persists,
+                "expires": expires}
+        self.conn.zadd(server + ":keyspace", str(timeutils.convert_to_epoch(timestamp)), data)
+
+    def save_expired_evicted_info(self, server, timestamp, expires, evicts):
+        """Saves expired and evicted key number
+
+        Args:
+            server (str): The server ID                        # redis server的id，其拼写格式是server-ip:server-port
+            timestamp (datetime): The time of the info.        # 2016-04-14 11:40:13.663000
+            expires (int): Stats:expired_keys
+            evicts (int): Stats:evicted_keys
+        """
+        data = {"timestamp": str(timeutils.convert_to_epoch(timestamp)),
+                "expired": expires,
+                "evicted": evicts}
+        self.conn.zadd(server + ":expired_evicted", str(timeutils.convert_to_epoch(timestamp)), data)
+        print('key:%s, value:%s, data:%s' % (server + ":expired_evicted", str(timeutils.convert_to_epoch(timestamp)), data))
+
+    def save_hitrate_info(self, server, timestamp, hit_rate):
+        """Saves hit rate
+
+        Args:
+            server (str): The server ID                        # redis server的id，其拼写格式是server-ip:server-port
+            timestamp (datetime): The time of the info.        # 2016-04-14 11:40:13.663000
+            used (int): Keyspace hit rate.                    # hit rate: 98
+        """
+        epoch = str(timeutils.convert_to_epoch(timestamp))                            # 精确到秒
+        current_date = timestamp.strftime('%y%m%d')                                      # 精确到天
+        logging.debug('epoch:%s, current_date:%s, hitrate:%s' % (epoch, current_date, hit_rate))
+
+        # start a redis MULTI/EXEC transaction
+        pipeline = self.conn.pipeline()
+
+        # keep aggregate command in a hash
+        hit_rate_key = server + ":HitRateBySecond"
+        pipeline.hset(hit_rate_key, epoch, hit_rate)
+        logging.debug('hit_rate_key:%s, epoch:%s, hit_rate:%s' % (hit_rate_key, epoch, hit_rate))
+
+        hit_rate_key = server + ":HitRateByMinute"
+        field_name = current_date + ":" + str(timestamp.hour) + ":"
+        field_name += str(timestamp.minute)
+        pipeline.hset(hit_rate_key, field_name, hit_rate)
+        logging.debug('hit_rate_key:%s, field name:%s, hit_rate:%s' % (hit_rate_key, field_name, hit_rate))
+
+        hit_rate_key = server + ":HitRateByHour"
+        field_name = current_date + ":" + str(timestamp.hour)
+        pipeline.hset(hit_rate_key, field_name, hit_rate)
+        logging.debug('hit_rate_key:%s, field name:%s, hit_rate:%s' % (hit_rate_key, field_name, hit_rate))
+
+        hit_rate_key = server + ":HitRateByDay"
+        field_name = current_date
+        pipeline.hset(hit_rate_key, field_name, hit_rate)
+        logging.debug('hit_rate_key:%s, field name:%s, hit_rate:%s' % (hit_rate_key, field_name, hit_rate))
+
+        # commit transaction to redis
+        pipeline.execute()
 
     def save_info_command(self, server, timestamp, info):
         """Save Redis info command dump
@@ -37,59 +110,68 @@ class RedisStatsProvider(object):
             timestamp (datetime): Timestamp.
             info (dict): The result of a Redis INFO command.
         """
-        self.conn.set(server + ":Info", json.dumps(info))
+        self.conn.set(server + ":Info", json.dumps(info))    # server-ip:server-port:Info, info命令的结果
 
     def save_monitor_command(self, server, timestamp, command, keyname,
                              argument):
         """save information about every command
 
         Args:
-            server (str): Server ID
-            timestamp (datetime): Timestamp.
-            command (str): The Redis command used.
-            keyname (str): The key the command acted on.
-            argument (str): The args sent to the command.
+            server (str): Server ID                         # redis server的id，其拼写格式是server-ip:server-port
+            timestamp (datetime): Timestamp.                # timestamp:2016-04-13 16:26:13.266209
+            command (str): The Redis command used.          # redis 命令
+            keyname (str): The key the command acted on.    # 命令操作的redis key
+            argument (str): The args sent to the command.   # key的value
         """
 
-        epoch = str(timeutils.convert_to_epoch(timestamp))
-        current_date = timestamp.strftime('%y%m%d')
+        epoch = str(timeutils.convert_to_epoch(timestamp))                            # 精确到秒
+        current_date = timestamp.strftime('%y%m%d')                                      # 精确到天
+        logging.debug('epoch:%s, current_date:%s' % (epoch, current_date))
 
         # start a redis MULTI/EXEC transaction
         pipeline = self.conn.pipeline()
 
-        # store top command and key counts in sorted set for every second
-        # top N are easily available from sorted set in redis
-        # also keep a sorted set for every day
-        # switch to daily stats when stats requsted are for a longer time period        
+        # store top command and key counts in sorted set for every second             # 以sorted sort形式存储每秒的top commands number 和 top key number
+        # top N are easily available from sorted set in redis                        # 从sorted sort结构中很容易计算出top N
+        # also keep a sorted set for every day                                        # 同样，也以sorted sort形式存储每天的top commands number 和 top key number
+        # switch to daily stats when stats requsted are for a longer time period    # 当以天为周期计算top数的时候，这个值便很有用
 
         command_count_key = server + ":CommandCount:" + epoch
         pipeline.zincrby(command_count_key, command, 1)
+        logging.debug('command_count_key:%s, command:%s' % (command_count_key, command))
 
         command_count_key = server + ":DailyCommandCount:" + current_date
         pipeline.zincrby(command_count_key, command, 1)
+        logging.debug('command_count_key:%s, command:%s' % (command_count_key, command))
 
         key_count_key = server + ":KeyCount:" + epoch
         pipeline.zincrby(key_count_key, keyname, 1)
+        logging.debug('key_count_key:%s, keyname:%s' % (key_count_key, keyname))
 
         key_count_key = server + ":DailyKeyCount:" + current_date
         pipeline.zincrby(key_count_key, keyname, 1)
+        logging.debug('key_count_key:%s, keyname:%s' % (key_count_key, keyname))
 
         # keep aggregate command in a hash
         command_count_key = server + ":CommandCountBySecond"
         pipeline.hincrby(command_count_key, epoch, 1)
+        logging.debug('command_count_key:%s, epoch:%s' % (command_count_key, epoch))
 
         command_count_key = server + ":CommandCountByMinute"
         field_name = current_date + ":" + str(timestamp.hour) + ":"
         field_name += str(timestamp.minute)
         pipeline.hincrby(command_count_key, field_name, 1)
+        logging.debug('command_count_key:%s, field name:%s' % (command_count_key, field_name))
 
         command_count_key = server + ":CommandCountByHour"
         field_name = current_date + ":" + str(timestamp.hour)
         pipeline.hincrby(command_count_key, field_name, 1)
+        logging.debug('command_count_key:%s, field name:%s' % (command_count_key, field_name))
 
         command_count_key = server + ":CommandCountByDay"
         field_name = current_date
         pipeline.hincrby(command_count_key, field_name, 1)
+        logging.debug('command_count_key:%s, field name:%s' % (command_count_key, field_name))
 
         # commit transaction to redis
         pipeline.execute()
@@ -134,6 +216,66 @@ class RedisStatsProvider(object):
 
         return memory_data
 
+    def get_keyspace_info(self, server, from_date, to_date):
+        """Get stats for KeySpace between a range of dates
+
+        Args:
+            server (str): The server ID
+            from_date (datetime): Get keyspace info from this date onwards.
+            to_date (datetime): Get keyspace info up to this date.
+        """
+        keyspace_data = []
+        start = timeutils.convert_to_epoch(from_date)
+        end = timeutils.convert_to_epoch(to_date)
+        # print('key:%s, start:%s %s, end:%s %s' % (server + ":keyspace", start, from_date, end, to_date))
+        rows = self.conn.zrangebyscore(server + ":keyspace", start, end)
+
+        for row in rows:
+            # print('row:%s' % (row))
+            # TODO: Check to see if there's not a better way to do this. Using
+            # eval feels like it could be wrong/dangerous... but that's just a
+            # feeling.
+            row = ast.literal_eval(row)
+            parts = []
+
+            # convert the timestamp
+            timestamp = datetime.fromtimestamp(int(row['timestamp']))
+            timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+            keyspace_data.append([timestamp, row['persists'], row['expires']])
+
+        return keyspace_data
+
+    def get_expired_evicted_info(self, server, from_date, to_date):
+        """Get stats for expired-evicted between a range of dates
+
+        Args:
+            server (str): The server ID
+            from_date (datetime): Get expired_evicted info from this date onwards.
+            to_date (datetime): Get expired_evicted info up to this date.
+        """
+        expired_evicted_data = []
+        start = timeutils.convert_to_epoch(from_date)
+        end = timeutils.convert_to_epoch(to_date)
+        # print('key:%s, start:%s %s, end:%s %s' % (server + ":expired_evicted", start, from_date, end, to_date))
+        rows = self.conn.zrangebyscore(server + ":expired_evicted", start, end)
+
+        for row in rows:
+            # print('row:%s' % (row))
+            # TODO: Check to see if there's not a better way to do this. Using
+            # eval feels like it could be wrong/dangerous... but that's just a
+            # feeling.
+            row = ast.literal_eval(row)
+            parts = []
+
+            # convert the timestamp
+            timestamp = datetime.fromtimestamp(int(row['timestamp']))
+            timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+            expired_evicted_data.append([timestamp, row['expired'], row['evicted']])
+
+        return expired_evicted_data
+
     def get_command_stats(self, server, from_date, to_date, group_by):
         """Get total commands processed in the given time period
 
@@ -143,6 +285,7 @@ class RedisStatsProvider(object):
             to_date (datetime): Get data to this date.
             group_by (str): How to group the stats.
         """
+        # logging.debug("get_command_stats(server:%s, from_date:%s, to_date:%s, group_by:%s)" % (server, from_date, to_date, group_by))
         s = []
         time_stamps = []
         key_name = ""
@@ -186,6 +329,7 @@ class RedisStatsProvider(object):
 
         data = []
         counts = self.conn.hmget(key_name, s)
+        # logging.debug("key_name:%s, time_stamps:%s, s:%s, counts:%s" % (key_name, time_stamps, s, counts))
         for x in xrange(0,len(counts)):
             # the default time format string
             time_fmt = '%Y-%m-%d %H:%M:%S'
@@ -199,7 +343,7 @@ class RedisStatsProvider(object):
 
             # get the count.
             try:
-                if counts[x] is not None: 
+                if counts[x] is not None:
                     count = int(counts[x])
                 else:
                     count = 0
@@ -213,6 +357,91 @@ class RedisStatsProvider(object):
 
             # add to the data
             data.append([count, timestamp])
+        # logging.debug("data:%s" % (data))
+        return reversed(data)
+
+    def get_hit_rate_stats(self, server, from_date, to_date, group_by):
+        """Get key space hit rate in the given time period
+
+        Args:
+            server (str): The server ID
+            from_date (datetime): Get data from this date.
+            to_date (datetime): Get data to this date.
+            group_by (str): How to group the stats.
+        """
+        # logging.debug("get_command_stats(server:%s, from_date:%s, to_date:%s, group_by:%s)" % (server, from_date, to_date, group_by))
+        s = []
+        time_stamps = []
+        key_name = ""
+
+        if group_by == "day":
+            key_name = server + ":HitRateByDay"
+            t = from_date.date()
+            while t <= to_date.date():
+                s.append(t.strftime('%y%m%d'))
+                time_stamps.append(str(timeutils.convert_to_epoch(t)))
+                t = t + timedelta(days=1)
+
+        elif group_by == "hour":
+            key_name = server + ":HitRateByHour"
+
+            t = from_date
+            while t<= to_date:
+                field_name = t.strftime('%y%m%d') + ":" + str(t.hour)
+                s.append(field_name)
+                time_stamps.append(str(timeutils.convert_to_epoch(t)))
+                t = t + timedelta(seconds=3600)
+
+        elif group_by == "minute":
+            key_name = server + ":HitRateByMinute"
+
+            t = from_date
+            while t <= to_date:
+                field_name = t.strftime('%y%m%d') + ":" + str(t.hour)
+                field_name += ":" + str(t.minute)
+                s.append(field_name)
+                time_stamps.append(str(timeutils.convert_to_epoch(t)))
+                t = t + timedelta(seconds=60)
+
+        else:
+            key_name = server + ":HitRateBySecond"
+            start = timeutils.convert_to_epoch(from_date)
+            end = timeutils.convert_to_epoch(to_date)
+            for x in range(start, end + 1):
+                s.append(str(x))
+                time_stamps.append(x)
+
+        data = []
+        counts = self.conn.hmget(key_name, s)
+        # logging.debug("key_name:%s, time_stamps:%s, s:%s, counts:%s" % (key_name, time_stamps, s, counts))
+        for x in xrange(0,len(counts)):
+            # the default time format string
+            time_fmt = '%Y-%m-%d %H:%M:%S'
+
+            if group_by == "day":
+                time_fmt = '%Y-%m-%d'
+            elif group_by == "hour":
+                time_fmt = '%Y-%m-%d %H:00:00'
+            elif group_by == "minute":
+                time_fmt = '%Y-%m-%d %H:%M:00'
+
+            # get the count.
+            try:
+                if counts[x] is not None:
+                    count = int(counts[x])
+                else:
+                    count = 0
+            except Exception as e:
+                count = 0
+
+            # convert the timestamp
+            timestamp = int(time_stamps[x])
+            timestamp = datetime.fromtimestamp(timestamp)
+            timestamp = timestamp.strftime(time_fmt)
+
+            # add to the data
+            data.append([count, timestamp])
+        # logging.debug("data:%s" % (data))
         return reversed(data)
 
     def get_top_commands_stats(self, server, from_date, to_date):

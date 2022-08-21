@@ -3,9 +3,19 @@ import tornado.ioloop
 import tornado.web
 import dateutil.parser
 import datetime
+from dateutil import tz
 
+class ExpiredEvictedController(BaseController):
 
-class MemoryController(BaseController):
+    def convert_gmt2est(self, gmt):
+        from_zone = tz.tzutc()
+        to_zone = tz.tzlocal()
+        utc = datetime.datetime.strptime(gmt, '%Y-%m-%d %H:%M:%S')
+        # Tell the datetime object that it's in UTC time zone since
+        # datetime objects are 'naive' by default
+        utc = utc.replace(tzinfo=from_zone)
+        # Convert time zone
+        return utc.astimezone(to_zone)
 
     def get(self):
         server = self.get_argument("server")
@@ -20,8 +30,10 @@ class MemoryController(BaseController):
             delta = datetime.timedelta(seconds=60)
             start = end - delta
         else:
-            start = dateutil.parser.parse(from_date)
-            end   = dateutil.parser.parse(to_date)
+            start = self.convert_gmt2est(str(dateutil.parser.parse(from_date))[0:-6])
+            end   = self.convert_gmt2est(str(dateutil.parser.parse(to_date))[0:-6])
+
+            # print('from_date:%s %s, to_date:%s %s' % (from_date, start, to_date, end))
 
         combined_data = []
         # TODO: These variables aren't currently used; should they be removed?
@@ -29,10 +41,10 @@ class MemoryController(BaseController):
         prev_current=0
         counter=0
 
-        memory_info = self.stats_provider.get_memory_info(server, start, end)
-        inc = round(float(len(memory_info)) / 375)
+        expired_evicted_info = self.stats_provider.get_expired_evicted_info(server, start, end)
+        inc = round(float(len(expired_evicted_info)) / 375)
         index = 0
-        for data in memory_info:
+        for data in expired_evicted_info:
             index += 1
             if inc <= index:
                 index = 0
